@@ -21,6 +21,7 @@ return new class extends Migration
             $table->foreignId('id_penjualan')->constrained('penjualan')->onDelete('cascade'); // Pastikan ada
             $table->timestamps();
         });
+        
     }
 
     /**

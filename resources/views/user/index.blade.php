@@ -39,13 +39,15 @@
                                             <a href="{{ route('user.edit', $user['id']) }}" class="mx-1 btn btn-warning btn-circle">
                                                 <i class="fas fa-pencil-alt"></i>
                                             </a>
-                                            <form action="{{ route('user.delete', $user['id']) }}" method="post" class="d-inline-block">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="mx-1 btn btn-danger btn-circle" onclick="return confirm('Apakah Anda yakin ingin menghapus?')">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </form>
+                                            @if ($user['role'] !== 'admin')
+                                                <form action="{{ route('user.delete', $user['id']) }}" method="post" class="d-inline-block">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="mx-1 btn btn-danger btn-circle" onclick="return confirm('Apakah Anda yakin ingin menghapus?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

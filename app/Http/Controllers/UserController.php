@@ -73,25 +73,28 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required',
             'email' => 'required',
+            'role' => 'required'
         ]);
-
+    
         $user = User::find($id);
-
-        if ($request->password) {
+    
+        // Hanya update password jika tidak kosong
+        if ($request->filled('password')) {
             $request->validate([
-                'password' => 'min:6', 
+                'password' => 'min:4',
             ]);
             $user->password = Hash::make($request->password);
         }
-
+    
         $user->name = $request->name;
         $user->email = $request->email;
         $user->role = $request->role;
-
+    
         $user->save();
-
+    
         return redirect()->route('user.index')->with('success', 'Data berhasil diperbarui!');
     }
+    
 
 
     /**
@@ -99,10 +102,18 @@ class UserController extends Controller
      */
     public function destroy(string $id)
     {
-        User::where('id', $id)->delete();
-
+        $user = User::find($id);
+    
+        // Cegah penghapusan user dengan role admin
+        if ($user && $user->role === 'admin') {
+            return redirect()->back()->with('Failed', 'User dengan role admin tidak bisa dihapus!');
+        }
+    
+        $user->delete();
+    
         return redirect()->back()->with('Success', 'Berhasil menghapus data!');
     }
+    
 
     public function showLogin() {
         return view('login');

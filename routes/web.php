@@ -30,14 +30,17 @@ Route::middleware('auth')->group(function() {
     });
 
 
-Route::controller(UserController::class)->prefix('user')->name('user.')->group(function () {
-    Route::get('/', 'index')->name('index');
-    Route::get('/create', 'create')->name('create');
-    Route::post('/store', 'store')->name('store');
-    Route::get('/edit/{id}', 'edit')->name('edit');
-    Route::patch('/update/{id}', 'update')->name('update');
-    Route::delete('/delete/{id}', 'destroy')->name('delete');
+Route::middleware('role:admin')->group(function() {
+    Route::controller(UserController::class)->prefix('user')->name('user.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/create', 'create')->name('create');
+        Route::post('/store', 'store')->name('store');
+        Route::get('/edit/{id}', 'edit')->name('edit');
+        Route::patch('/update/{id}', 'update')->name('update');
+        Route::delete('/delete/{id}', 'destroy')->name('delete');
+    });
 });
+
 
 Route::controller(ProdukController::class)->prefix('product')->name('product.')->group(function () {
     Route::get('/', 'index')->name('index');
@@ -50,14 +53,12 @@ Route::controller(ProdukController::class)->prefix('product')->name('product.')-
 });
 
 Route::controller(PenjualanController::class)->prefix('penjualan')->name('purchase.')->group(function () {
-    Route::get('/', 'index')->name('index');
-    Route::get('/menu', 'menuShow')->name('menu');
-    Route::get('/create', 'create')->name('create');
-    Route::post('/store', 'store')->name('store');
-    Route::get('/edit/{id}', 'edit')->name('edit');
-    Route::patch('/update/{id}', 'update')->name('update');
-    Route::delete('/delete/{id}', 'destroy')->name('delete');
-});
+        Route::get('/', 'index')->name('index');
+        Route::get('/menu', 'menuShow')->name('menu');
+        Route::get('/export', 'export')->name('export');
+        Route::get('/export/filtered', 'exportFiltered')->name('exportFiltered'); // <-- ini penting
+    });
+
 
 Route::controller(TransaksiController::class)->prefix('transaction')->name('transaction.')->group(function () {
     Route::get('/', 'index')->name('index');
@@ -66,7 +67,11 @@ Route::controller(TransaksiController::class)->prefix('transaction')->name('tran
     Route::post('/update-cart', 'cart')->name('cart');
 
     Route::post('/member/store-session', 'storeSession')->name('member.storeSession');
-    Route::post('/member/checkout', 'storeSession')->name('member.checkout');
+    Route::get('/member/checkout', 'checkoutMember')->name('member.checkout');
+    Route::post('/member/checkout', 'processCheckoutMember')->name('member.process');
+
+    Route::get('/show/struk/{id}', 'showStrukById')->name('checkout.success');
+    Route::get('/struk/{id}/download-pdf', 'downloadPdf')->name('download.pdf');
 });
 
 });

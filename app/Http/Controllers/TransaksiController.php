@@ -2,9 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Transaksi;
 use App\Models\Produk;
+use App\Models\Member;
+use App\Models\Penjualan;
+use App\Models\DetailPenjualan;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use PDF;
 
 class TransaksiController extends Controller
 {
@@ -16,7 +23,7 @@ class TransaksiController extends Controller
         $transactions = Transaksi::with([
             'member',
             'user',
-            'penjualan.detailPenjualan.produk' // make sure your relation names match the models
+            'penjualan.detailPenjualan.produk'
         ])->get();
 
         return view('purchase.index', compact('transactions'));
@@ -76,6 +83,7 @@ class TransaksiController extends Controller
         return view('purchase.sale.checkout', compact('produks', 'cart'));
     }
 
+    // Menampung data product yg akan dicheckout
     public function cart(Request $request)
     {
         $cart = array_filter($request->produk, function ($qty) {
@@ -90,6 +98,7 @@ class TransaksiController extends Controller
         return redirect()->route('transaction.checkout')->with('success', 'Produk berhasil ditambahkan ke keranjang');
     }
 
+    // Function untuk mengambil data dan disimpan ke session
     public function storeSession(Request $request)
     {
         $produkInput = $request->input('produk'); 
@@ -108,23 +117,6 @@ class TransaksiController extends Controller
 
 
         return response()->json(['status' => 'success']);
-    }
-
-
-    // Menampilkan halaman checkout member 
-    public function checkoutMember()
-    {
-        $checkoutData = session('checkout_data');
-
-        if (!$checkoutData) {
-            return redirect()->route('transaction.checkout')->with('error', 'Data checkout tidak ditemukan.');
-        }
-
-        return view('purchase.sale.co_member', [
-            'checkoutData' => $checkoutData,
-            'totalBayar' => $checkoutData['total_bayar'],
-            'point' => floor($checkoutData['total_harga'] * 0.10), // contoh: 1 poin per 1000
-        ]);
     }
 
     // Function untuk mengirim data checkout ke database (non member)
@@ -175,37 +167,159 @@ class TransaksiController extends Controller
         return redirect()->route('transaction.checkout.success', $transaksi->id)->with('success', 'Transaksi berhasil!');
     }
 
-
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    // Menampilkan halaman checkout member 
+    public function checkoutMember()
     {
-        //
+        $checkoutData = session('checkout_data');
+    
+        if (!$checkoutData) {
+            return redirect()->route('transaction.checkout')->with('error', 'Data checkout tidak ditemukan.');
+        }
+    
+        return view('purchase.sale.co_member', [
+            'checkoutData' => $checkoutData,
+            'totalBayar' => $checkoutData['total_bayar'],
+            'point' => floor($checkoutData['total_harga'] * 0.10), // contoh: 1 poin per 1000
+        ]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+
+    // Function untuk mengirim data checkout ke database (member)
+    public function processCheckoutMember(Request $request)
     {
-        //
+        $request->validate([
+            'nama_member' => 'required|string|max:255',
+            'point' => 'nullable|string|max:15',
+            'pakai_point' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $checkoutData = session('checkout_data', []);
+            $produkData = $checkoutData['produk'] ?? [];
+            $totalBayar = $checkoutData['total_bayar'] ?? 0;
+            $no_hp = $checkoutData['no_hp'] ?? null;
+
+            if (empty($produkData) || !$no_hp) {
+                return redirect()->route('checkout')->with('error', 'Data checkout tidak lengkap.');
+            }
+
+            $member = Member::where('no_hp', $no_hp)->first();
+
+            $isNewMember = false;
+
+            if (!$member) {
+                $member = Member::create([
+                    'nama_member' => $request->nama_member,
+                    'no_hp' => $no_hp,
+                    'tanggal_daftar' => now(),
+                    'point' => 0 
+                ]);
+                $isNewMember = true;
+            }
+
+            $totalProduk = 0;
+            $totalHarga = 0;
+
+            foreach ($produkData as $id => $qty) {
+                $produk = Produk::find($id);
+                if ($produk) {
+                    $totalProduk += $qty;
+                    $totalHarga += $produk->harga * $qty;
+                }
+            }
+
+            $pakaiPoint = $request->has('pakai_point');
+
+            $pointDipakai = 0;
+            if (!$isNewMember && $member->point > 0 && $pakaiPoint) {
+                $pointDipakai = min($member->point, $totalHarga);
+                $totalHarga -= $pointDipakai;
+            }
+
+            $penjualan = Penjualan::create([
+                'total_harga' => $totalHarga,
+                'tanggal_penjualan' => now(),
+                'total_produk' => $totalProduk,
+            ]);
+
+            foreach ($produkData as $id => $qty) {
+                $produk = Produk::find($id);
+                if ($produk && $produk->stock < $qty) {
+                    return back()->with('error', 'Stok produk ' . $produk->nama_produk . ' tidak mencukupi.');
+                }
+
+                DetailPenjualan::create([
+                    'id_penjualan' => $penjualan->id,
+                    'id_produk' => $produk->id,
+                    'quantity' => $qty,
+                    'subtotal' => $produk->harga * $qty,
+                ]);
+
+                $produk->stock -= $qty;
+                $produk->save();
+            }
+
+            $kembalian = max(0, $totalBayar - $totalHarga);
+
+            Transaksi::create([
+                'kembalian' => $kembalian,
+                'total_bayar' => $totalBayar,
+                'sub_total' => $totalHarga,
+                'poin_digunakan' => $pointDipakai,
+                'id_member' => $member->id,
+                'id_users' => Auth::id(),
+                'id_penjualan' => $penjualan->id
+            ]);
+            
+
+            $pointBaru = round(($totalHarga + $pointDipakai) * 0.10);
+
+            $member->point = (!$isNewMember ? ($member->point - $pointDipakai + $pointBaru) : $pointBaru);
+            $member->save();
+
+            DB::commit();
+            $transaksi = Transaksi::where('id_penjualan', $penjualan->id)->first();
+
+            return redirect()->route('transaction.checkout.success', $transaksi->id)->with('success', 'Transaksi berhasil!');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            dd($e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan saat memproses transaksi.')->withInput();
+        }
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    // Show Struk Transaksi (akan mengarahkan ke page struk)
+    public function showStrukById($id)
     {
-        //
+        $transaction = Transaksi::with([
+            'penjualan.detailPenjualan.produk',
+            'member',
+            'user'
+        ])->find($id);
+
+        if (!$transaction) {
+            return redirect()->route('transaction.index')->with('error', 'Transaksi tidak ditemukan.');
+        }
+
+        return view('purchase.struk', compact('transaction'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    // Function untuk download pdf
+    public function downloadPdf($id)
     {
-        //
+        $transaction = Transaksi::with([
+            'penjualan.detailPenjualan.produk',
+            'member',
+            'user'
+        ])->findOrFail($id);
+
+        $pdf = PDF::loadView('purchase.receipt_pdf', compact('transaction'))
+            ->setPaper('A5', 'potrait');
+
+        return $pdf->download('receipt.pdf');
     }
+
+
+    
 }

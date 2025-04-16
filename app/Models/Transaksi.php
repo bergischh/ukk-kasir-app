@@ -9,7 +9,7 @@ class Transaksi extends Model
     protected $table = 'transaksi';
 
     protected $fillable = [
-        'kembalian', 'total_bayar', 'sub_total', 'id_member', 'id_users', 'id_penjualan'
+        'kembalian', 'total_bayar', 'sub_total', 'poin_digunakan', 'id_member', 'id_users', 'id_penjualan'
     ];
 
     public function member() {
@@ -21,6 +21,7 @@ class Transaksi extends Model
     }
 
     public function penjualan() {
-        return $this->belongsTo(Member::class, 'id_penjualan');
+        return $this->belongsTo(Penjualan::class, 'id_penjualan');
     }
+    
 }

@@ -33,7 +33,7 @@ class ProdukController extends Controller
         $request->validate([
             'nama_produk' => 'required',
             'harga' => 'required',
-            'stock' => 'required',
+            'stock' => 'required|numeric|min:0|max:9223372036854775807',
             'gambar_produk' => 'required|mimes:png,jpg,jpeg|max:2048',
         ]);
 

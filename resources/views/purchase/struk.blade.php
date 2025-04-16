@@ -6,22 +6,24 @@
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                        <a href="" class="btn btn-primary">
+                        <a href="{{ route('transaction.download.pdf', $transaction->id) }}" class="btn btn-primary">
                             <i class="bi bi-download"></i> Unduh
                         </a>                    
-                        <a href="" class="btn btn-secondary">Kembali</a>
+                        <a href="{{ route('transaction.index') }}" class="btn btn-secondary">Kembali</a>
                 </div>
                 <div class="text-end">
-                    <p class="mb-0"><strong>Invoice - #21</strong></p>
-                    <p class="mb-0">20 November 2020</p>
+                    <p class="mb-0"><strong>Invoice - #{{ $transaction->id }}</strong></p>
+                    <p class="mb-0">{{ \Carbon\Carbon::parse($transaction->created_at)->translatedFormat('d F Y') }}</p>
                 </div>
             </div>
 
-                <p class="mb-1"><strong>0898828384828</strong></p>
-                <p class="mb-1">NO MEMBER : 08399383838</p>
+            @if($transaction->member)
+                {{-- <p class="mb-1"><strong>{{ $transaction->member->no_hp }}</strong></p> --}}
+                <p class="mb-1">NO MEMBER : {{ $transaction->member->no_hp }}</p>
                 <p class="mb-1">STATUS BERGABUNG : Aktif</p>
-                <p class="mb-1">MEMBER SEJAK : 12 Oktober 0303</p>
-                <p class="mb-3">MEMBER POIN : 3000</p>
+                <p class="mb-1">MEMBER SEJAK : {{ \Carbon\Carbon::parse($transaction->member->created_at)->translatedFormat('d F Y') }}</p>
+                <p class="mb-3">MEMBER POIN : {{ $transaction->member->point ?? 0 }}</p>
+            @endif
 
             <table class="table table-borderless">
                 <thead>
@@ -33,12 +35,14 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @foreach ($transaction->penjualan->detailPenjualan as $item)
                         <tr>
-                            <td>Brownies</td>
-                            <td class="text-end">Rp. 30.000,00</td>
-                            <td class="text-center">2</td>
-                            <td class="text-end">Rp. 60.000,00</td>
+                            <td>{{ $item->produk->nama_produk }}</td>
+                            <td class="text-end">Rp {{ number_format($item->produk->harga, 0, ',', '.') }}</td>
+                            <td class="text-center">{{ $item->quantity }}</td>
+                            <td class="text-end">Rp {{ number_format($item->subtotal, 0, ',', '.') }}</td>
                         </tr>
+                    @endforeach
                 </tbody>
             </table>
 
@@ -47,21 +51,25 @@
                     <div class="row text-center">
                         <div class="col">
                             <p class="mb-1">POIN DIGUNAKAN</p>
-                            <strong>900</strong>
+                            <strong>{{ $transaction->poin_digunakan ?? 0 }}</strong>
                         </div>
                         <div class="col">
                             <p class="mb-1">KASIR</p>
-                            <strong>Petugas 1</strong>
+                            <strong>{{ $transaction->user->name }}</strong>
                         </div>
                         <div class="col">
                             <p class="mb-1">KEMBALIAN</p>
-                            <strong>0</strong>
+                            <strong>Rp {{ number_format($transaction->kembalian, 0, ',', '.') }}</strong>
+                        </div>
+                        <div class="col">
+                            <p class="mb-1">JUMLAH BAYAR</p>
+                            <strong>Rp {{ number_format($transaction->total_bayar, 0, ',', '.') }}</strong>
                         </div>
                     </div>
                 </div>
                 <div class="bg-dark text-white text-end p-3" style="min-width: 200px;">
                     <p class="mb-1">TOTAL</p>
-                    <h4 class="mb-0">Rp. 60.000,00</h4>
+                    <h4 class="mb-0">Rp {{ number_format($transaction->sub_total, 0, ',', '.') }}</h4>
                 </div>
             </div>
         </div>

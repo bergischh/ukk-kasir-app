@@ -68,7 +68,7 @@
             <li class="nav-item">
                 <a class="nav-link" href="{{ route('transaction.index') }}">
                     <i class="fas fa-fw fa-table"></i>
-                    <span>Pembelian</span></a>
+                    <span>Penjualan</span></a>
             </li>
 
             @if (auth()->user() && auth()->user()->role === 'admin')
